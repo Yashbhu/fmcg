@@ -1,103 +1,156 @@
 # technical_agent_logic.py
-import pandas as pd
-from groq import Groq
-import json
-import re
-import os
-from dotenv import load_dotenv
-import sqlite3
-import time # <-- Import the 'time' library for waiting
 
+import os
+import re
+import json
+import time
+import sqlite3
+import pandas as pd
+from dotenv import load_dotenv
+
+# 🧠 Optional: Only import Groq when key is available to avoid crashes on import
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
+
+# --- Load environment variables ---
 load_dotenv()
 
-# --- SETUP GROQ API CLIENT ---
-try:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise ValueError("Groq API key not found. Please set the GROQ_API_KEY in your .env file.")
-    client = Groq(api_key=api_key)
-except Exception as e:
-    print(f"Error initializing Groq client: {e}")
-    client = None
+# --- Initialize Groq client safely ---
+client = None
+api_key = os.getenv("GROQ_API_KEY")
+if Groq and api_key:
+    try:
+        client = Groq(api_key=api_key)
+    except Exception as e:
+        print(f"❗️ Error initializing Groq client: {e}")
+else:
+    print("⚠️ GROQ_API_KEY not set or Groq package missing — skipping live API mode.")
 
 ACTIVE_MODEL = "llama-3.1-8b-instant"
 
+# Example fallback text
 RFP_DOCUMENT_TEXT = """
 Technical Scope of Supply for Delhi Metro Phase V:
 The contractor shall supply, install, test, and commission the following 1.1 kV grade power cables.
-Item 1: Armored Power Cable with specs: Voltage Rating 1.1 kV, Conductor Material Copper, Insulation Type XLPE, Armor Type Steel Wire.
-Item 2: Armored Power Cable with specs: Voltage Rating 1.1 kV, Conductor Material Aluminium, Insulation Type XLPE, Armor Type Steel Wire.
+Item 1: Armored Power Cable — Voltage 1.1 kV, Conductor Copper, Insulation XLPE, Armor Steel Wire.
+Item 2: Armored Power Cable — Voltage 1.1 kV, Conductor Aluminium, Insulation XLPE, Armor Steel Wire.
 """
 
-def analyze_rfp_specs(rfp_summary):
-    """
-    Analyzes RFP text and matches products, now with a retry mechanism for API calls.
-    """
-    print("⚙️  Technical Agent (Groq): Starting analysis...")
-    if not client:
-        return None
 
+def analyze_rfp_specs(rfp_summary: dict):
+    """
+    Extracts technical specs from an RFP (via Groq API) 
+    and matches them to product SKUs from the SQLite database.
+    Returns a DataFrame of recommended SKUs + scores.
+    """
+    print("⚙️ Technical Agent: Starting analysis...")
+
+    # --- Step 1: Build RFP text ---
+    rfp_text = ""
+    if isinstance(rfp_summary, dict) and "title" in rfp_summary:
+        rfp_text = rfp_summary["title"]
+    elif isinstance(rfp_summary, str):
+        rfp_text = rfp_summary
+    else:
+        rfp_text = RFP_DOCUMENT_TEXT
+
+    # --- Step 2: Construct prompt for LLM ---
     prompt = f"""
-    From the RFP text below, extract technical specs for each item into a clean JSON array.
-    The keys must be "VoltageRating", "ConductorMaterial", "InsulationType", "ArmorType".
-    Your response must ONLY be the JSON array inside a ```json code block.
+    Extract all product technical specifications from this RFP text and return a JSON array.
 
-    RFP Text: --- {RFP_DOCUMENT_TEXT} ---
+    Required keys: "VoltageRating", "ConductorMaterial", "InsulationType", "ArmorType".
+    Respond ONLY with a ```json code block.
+
+    RFP Text:
+    ---
+    {rfp_text}
+    ---
     """
-    
-    # --- NEW: Retry Logic ---
-    attempts = 3
-    for i in range(attempts):
-        try:
-            response = client.chat.completions.create(
-                model=ACTIVE_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0
-            )
-            json_text_match = re.search(r'```json\n(.*?)\n```', response.choices[0].message.content, re.DOTALL)
-            if not json_text_match:
-                 raise ValueError("Could not find a JSON block in the model's response.")
-            
-            json_text = json_text_match.group(1)
-            required_products = json.loads(json_text)
-            print("   - Step 1.2: Successfully extracted specs via Groq.")
-            # If successful, break out of the loop
-            break
-        except Exception as e:
-            print(f"❗️ WARNING: API call attempt {i+1} failed. Error: {e}")
-            if i < attempts - 1:
-                wait_time = 2 ** i # Exponential backoff: 1, 2, 4 seconds
-                print(f"   - Retrying in {wait_time} second(s)...")
-                time.sleep(wait_time)
-            else:
-                print("❗️ ERROR (Technical Agent): All API call attempts failed.")
-                return None
-    # --- END OF RETRY LOGIC ---
 
+    required_products = None
+
+    # --- Step 3: Try LLM call with retries ---
+    if client:
+        for i in range(3):
+            try:
+                response = client.chat.completions.create(
+                    model=ACTIVE_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                )
+
+                content = response.choices[0].message.content
+                match = re.search(r"```json\s*(.*?)\s*```", content, re.DOTALL)
+                if not match:
+                    raise ValueError("No JSON block found in Groq response.")
+                json_text = match.group(1)
+                required_products = json.loads(json_text)
+                print("✅ Extracted specs successfully from Groq.")
+                break
+            except Exception as e:
+                print(f"❗️ Attempt {i+1} failed: {e}")
+                time.sleep(2 ** i)
+        else:
+            print("❌ All attempts failed; using fallback specs.")
+    else:
+        print("⚠️ Skipping Groq API — using default RFP data.")
+        required_products = [
+            {
+                "VoltageRating": "1.1 kV",
+                "ConductorMaterial": "Copper",
+                "InsulationType": "XLPE",
+                "ArmorType": "Steel Wire",
+            },
+            {
+                "VoltageRating": "1.1 kV",
+                "ConductorMaterial": "Aluminium",
+                "InsulationType": "XLPE",
+                "ArmorType": "Steel Wire",
+            },
+        ]
+
+    # --- Step 4: Load OEM product data ---
     try:
-        conn = sqlite3.connect('rfp_database.db')
-        oem_products_df = pd.read_sql_query("SELECT * FROM products", conn)
+        conn = sqlite3.connect("rfp_database.db")
+        oem_df = pd.read_sql_query("SELECT * FROM products", conn)
         conn.close()
     except sqlite3.Error as e:
-        print(f"   - ❗️ ERROR: Could not read from database. Error: {e}")
+        print(f"❗️ Database read error: {e}")
         return None
 
-    final_recommendations = []
-    for i, req_product in enumerate(required_products):
-        req_specs = {k: str(v).strip() for k, v in req_product.items()}
-        scores = []
-        for index, oem_product in oem_products_df.iterrows():
-            matched_specs = sum(1 for key, val in req_specs.items() if str(oem_product.get(key, '')).strip() == val)
-            score = (matched_specs / len(req_specs)) * 100
-            scores.append({'SKU': oem_product['SKU'], 'Score': score})
-        
-        best_match = sorted(scores, key=lambda x: x['Score'], reverse=True)[0]
-        final_recommendations.append({
-            'RFP_Item': f"Item {i+1}", 
-            'Recommended_SKU': best_match['SKU'], 
-            'Match_Score': best_match['Score']
+    if not isinstance(required_products, list) or len(required_products) == 0:
+        print("❗️ No products extracted.")
+        return None
+
+    # --- Step 5: Match extracted specs with DB ---
+    results = []
+    for i, req in enumerate(required_products):
+        req_clean = {k: str(v).strip().lower() for k, v in req.items()}
+        best_match = {"SKU": None, "Score": 0}
+
+        for _, row in oem_df.iterrows():
+            matches = sum(
+                1 for k, v in req_clean.items()
+                if str(row.get(k, "")).strip().lower() == v
+            )
+            score = (matches / len(req_clean)) * 100
+            if score > best_match["Score"]:
+                best_match = {"SKU": row["SKU"], "Score": score}
+
+        results.append({
+            "RFP_Item": f"Item {i + 1}",
+            "Recommended_SKU": best_match["SKU"],
+            "Match_Score": best_match["Score"],
         })
 
-    final_df = pd.DataFrame(final_recommendations)
+    df = pd.DataFrame(results)
     print("✅ Technical Agent: Analysis complete.")
-    return final_df
+    return df
+
+
+# --- Ensure function is registered at module level ---
+if __name__ == "__main__":
+    print("🔍 Self-test: running analyze_rfp_specs() with sample RFP")
+    print(analyze_rfp_specs({"title": RFP_DOCUMENT_TEXT}))

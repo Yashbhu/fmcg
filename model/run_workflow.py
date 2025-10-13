@@ -6,7 +6,8 @@ from typing import TypedDict, Optional
 from langgraph.graph import StateGraph, END
 
 # Import the logic functions from our other files
-from sales_agent_logic import scan_and_select_rfp
+from sales_agent_logic import scrape_all_tenders as scan_and_select_rfp
+
 from technical_agent_logic import analyze_rfp_specs
 from pricing_agent_logic import calculate_pricing
 
