@@ -1,8 +1,23 @@
-**/__pycache__/
-**/venv/
-**/.venv/
-.env
-model/.env
-# Ignore frontend API configuration
-frontend/lib/api.ts
+# Node & frontend
+node_modules/
+*/node_modules/
+.next/
+out/
+dist/
+build/
 
+# Python backend
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Misc
+.env
+.env.*
+.DS_Store
+.vscode/
+.idea/
