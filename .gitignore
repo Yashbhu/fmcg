@@ -3,3 +3,4 @@
 **/.venv/
 .env
 model/.env
+**/api.ts
