@@ -1,10 +1,14 @@
-# backend/routes/analyze.py
 from fastapi import APIRouter
+import sys, os
+
+# Fix import path so model folder is found
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 from model.technical_agent_logic import analyze_rfp_specs
 from model.pricing_agent_logic import calculate_pricing
 from model.sales_agent_logic import scrape_all_tenders
 
-router = APIRouter(prefix="/analysis", tags=["Analysis"])
+router = APIRouter(tags=["Analyze"])
 
 @router.post("/run")
 def run_analysis():
