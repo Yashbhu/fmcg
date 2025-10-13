@@ -1,16 +1,25 @@
 # technical_agent_logic.py
 import pandas as pd
-from openai import OpenAI
-import json, re, os
+from groq import Groq
+import json
+import re
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    raise ValueError("OpenAI API key not found in .env file or environment.")
-client = OpenAI(api_key=api_key)
+# --- SETUP GROQ API CLIENT ---
+try:
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("Groq API key not found. Please set the GROQ_API_KEY in your .env file.")
+    client = Groq(api_key=api_key)
+except Exception as e:
+    print(f"Error initializing Groq client: {e}")
+    client = None
 
+# --- Using the correct and available model name ---
+ACTIVE_MODEL = "llama-3.1-8b-instant"
 
 RFP_DOCUMENT_TEXT = """
 Technical Scope of Supply for Delhi Metro Phase V:
@@ -20,9 +29,13 @@ Item 2: Armored Power Cable with specs: Voltage Rating 1.1 kV, Conductor Materia
 """
 
 def analyze_rfp_specs(rfp_summary):
-    print("⚙️  Technical Agent (OpenAI): Starting analysis...")
-    
-    # THE FIX IS HERE: The variable must be inside curly braces {} in an f-string.
+    """
+    Analyzes RFP text using the correct Groq Llama3 model.
+    """
+    print(f"⚙️  Technical Agent (Groq): Starting analysis with model {ACTIVE_MODEL}...")
+    if not client:
+        return None
+
     prompt = f"""
     From the RFP text below, extract technical specs for each item into a clean JSON array.
     The keys must be "VoltageRating", "ConductorMaterial", "InsulationType", "ArmorType".
@@ -32,15 +45,20 @@ def analyze_rfp_specs(rfp_summary):
     """
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=ACTIVE_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0
         )
-        json_text = re.search(r'```json\n(.*)\n```', response.choices[0].message.content, re.DOTALL).group(1)
+        # We need a more flexible regex for the new model's output
+        json_text_match = re.search(r'```json\n(.*?)\n```', response.choices[0].message.content, re.DOTALL)
+        if not json_text_match:
+             raise ValueError("Could not find a JSON block in the model's response.")
+        
+        json_text = json_text_match.group(1)
         required_products = json.loads(json_text)
-        print("   - Step 1.2: Successfully extracted specs via OpenAI.")
+        print("   - Step 1.2: Successfully extracted specs via Groq.")
     except Exception as e:
-        print(f"❗️ ERROR (Technical Agent): Failed to get valid response from OpenAI. Error: {e}")
+        print(f"❗️ ERROR (Technical Agent): Failed to get valid response from Groq. Error: {e}")
         return None
 
     try:
@@ -54,11 +72,7 @@ def analyze_rfp_specs(rfp_summary):
         req_specs = {k: str(v).strip() for k, v in req_product.items()}
         scores = []
         for index, oem_product in oem_products_df.iterrows():
-            matched_specs = 0
-            for key, val in req_specs.items():
-                if str(oem_product.get(key, '')).strip() == val:
-                    matched_specs += 1
-            
+            matched_specs = sum(1 for key, val in req_specs.items() if str(oem_product.get(key, '')).strip() == val)
             score = (matched_specs / len(req_specs)) * 100
             scores.append({'SKU': oem_product['SKU'], 'Score': score})
         

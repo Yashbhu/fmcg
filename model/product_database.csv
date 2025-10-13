@@ -1,7 +1,4 @@
 SKU,ProductName,VoltageRating,ConductorMaterial,InsulationType,ArmorType
 PC-CU-XLPE-1100-SWA,1.1kV Copper XLPE SWA Cable,1.1 kV,Copper,XLPE,Steel Wire
 PC-AL-XLPE-1100-SWA,1.1kV Aluminium XLPE SWA Cable,1.1 kV,Aluminium,XLPE,Steel Wire
-PC-CU-PVC-1100-SWA,1.1kV Copper PVC SWA Cable,1.1 kV,Copper,PVC,Steel WireSKU,ProductName,VoltageRating,ConductorMaterial,InsulationType,ArmorType
-PC-CU-XLPE-1100-SWA,1.1kV Copper XLPE SWA Cable,1.1 kV,Copper,XLPE,Steel Wire
-PC-AL-XLPE-1100-SWA,1.1kV Aluminium XLPE SWA Cable,1.1 kV,Aluminium,XLPE,Steel Wire
 PC-CU-PVC-1100-SWA,1.1kV Copper PVC SWA Cable,1.1 kV,Copper,PVC,Steel Wire
