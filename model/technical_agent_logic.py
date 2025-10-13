@@ -5,6 +5,8 @@ import json
 import re
 import os
 from dotenv import load_dotenv
+import sqlite3
+import time # <-- Import the 'time' library for waiting
 
 load_dotenv()
 
@@ -18,7 +20,6 @@ except Exception as e:
     print(f"Error initializing Groq client: {e}")
     client = None
 
-# --- Using the correct and available model name ---
 ACTIVE_MODEL = "llama-3.1-8b-instant"
 
 RFP_DOCUMENT_TEXT = """
@@ -30,9 +31,9 @@ Item 2: Armored Power Cable with specs: Voltage Rating 1.1 kV, Conductor Materia
 
 def analyze_rfp_specs(rfp_summary):
     """
-    Analyzes RFP text using the correct Groq Llama3 model.
+    Analyzes RFP text and matches products, now with a retry mechanism for API calls.
     """
-    print(f"⚙️  Technical Agent (Groq): Starting analysis with model {ACTIVE_MODEL}...")
+    print("⚙️  Technical Agent (Groq): Starting analysis...")
     if not client:
         return None
 
@@ -43,28 +44,42 @@ def analyze_rfp_specs(rfp_summary):
 
     RFP Text: --- {RFP_DOCUMENT_TEXT} ---
     """
-    try:
-        response = client.chat.completions.create(
-            model=ACTIVE_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0
-        )
-        # We need a more flexible regex for the new model's output
-        json_text_match = re.search(r'```json\n(.*?)\n```', response.choices[0].message.content, re.DOTALL)
-        if not json_text_match:
-             raise ValueError("Could not find a JSON block in the model's response.")
-        
-        json_text = json_text_match.group(1)
-        required_products = json.loads(json_text)
-        print("   - Step 1.2: Successfully extracted specs via Groq.")
-    except Exception as e:
-        print(f"❗️ ERROR (Technical Agent): Failed to get valid response from Groq. Error: {e}")
-        return None
+    
+    # --- NEW: Retry Logic ---
+    attempts = 3
+    for i in range(attempts):
+        try:
+            response = client.chat.completions.create(
+                model=ACTIVE_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0
+            )
+            json_text_match = re.search(r'```json\n(.*?)\n```', response.choices[0].message.content, re.DOTALL)
+            if not json_text_match:
+                 raise ValueError("Could not find a JSON block in the model's response.")
+            
+            json_text = json_text_match.group(1)
+            required_products = json.loads(json_text)
+            print("   - Step 1.2: Successfully extracted specs via Groq.")
+            # If successful, break out of the loop
+            break
+        except Exception as e:
+            print(f"❗️ WARNING: API call attempt {i+1} failed. Error: {e}")
+            if i < attempts - 1:
+                wait_time = 2 ** i # Exponential backoff: 1, 2, 4 seconds
+                print(f"   - Retrying in {wait_time} second(s)...")
+                time.sleep(wait_time)
+            else:
+                print("❗️ ERROR (Technical Agent): All API call attempts failed.")
+                return None
+    # --- END OF RETRY LOGIC ---
 
     try:
-        oem_products_df = pd.read_csv('product_database.csv')
-    except FileNotFoundError:
-        print("   - ❗️ ERROR: product_database.csv not found!")
+        conn = sqlite3.connect('rfp_database.db')
+        oem_products_df = pd.read_sql_query("SELECT * FROM products", conn)
+        conn.close()
+    except sqlite3.Error as e:
+        print(f"   - ❗️ ERROR: Could not read from database. Error: {e}")
         return None
 
     final_recommendations = []

@@ -1,10 +1,10 @@
 # pricing_agent_logic.py
 import pandas as pd
+import sqlite3
 
 def calculate_pricing(technical_analysis_df):
     """
-    Calculates pricing based on the technical analysis, product prices,
-    and testing costs.
+    Calculates pricing by reading product and test costs from the SQLite database.
     """
     print("💰 Pricing Agent: Starting cost calculation...")
     
@@ -12,12 +12,17 @@ def calculate_pricing(technical_analysis_df):
         print("❗️ ERROR (Pricing Agent): No technical analysis provided to calculate pricing.")
         return None
         
+    # --- Read from database instead of CSVs ---
     try:
-        product_prices_df = pd.read_csv('product_prices.csv')
-        test_prices_df = pd.read_csv('test_prices.csv')
-    except FileNotFoundError as e:
-        print(f"❗️ ERROR (Pricing Agent): Missing data file - {e}")
+        conn = sqlite3.connect('rfp_database.db')
+        # Read both the products and tests tables
+        product_prices_df = pd.read_sql_query("SELECT SKU, UnitPrice FROM products", conn)
+        test_prices_df = pd.read_sql_query("SELECT * FROM tests", conn)
+        conn.close()
+    except sqlite3.Error as e:
+        print(f"❗️ ERROR (Pricing Agent): Could not read from database. Error: {e}")
         return None
+    # --- END OF MODIFICATION ---
     
     # Merge the technical recommendations with the product price list
     pricing_df = pd.merge(
@@ -28,11 +33,9 @@ def calculate_pricing(technical_analysis_df):
         how='left'
     )
     
-    # For this project, we assume all tests are required for the RFP
     total_test_cost = test_prices_df['TestCost'].sum()
     pricing_df['Test_Cost'] = total_test_cost
     
-    # Calculate the final total cost per item
     pricing_df['Total_Cost'] = pricing_df['UnitPrice'] + pricing_df['Test_Cost']
     
     print("✅ Pricing Agent: Calculation complete.")

@@ -1,5 +1,5 @@
 # main_orchestrator.py
-from sales_agent import scan_and_select_rfp
+from model.sales_agent_logic import scan_and_select_rfp
 
 class MainOrchestrator:
     def __init__(self, rfp_source_file):

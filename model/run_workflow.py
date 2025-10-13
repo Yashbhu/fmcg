@@ -13,7 +13,7 @@ from pricing_agent_logic import calculate_pricing
 # Step 1: Define the state that will be passed between agents
 class RfpWorkflowState(TypedDict):
     """Represents the shared memory of our RFP workflow."""
-    rfp_source_file: str
+    # We no longer need rfp_source_file, so it has been removed.
     selected_rfp: Optional[dict]
     technical_analysis: Optional[pd.DataFrame]
     final_pricing: Optional[pd.DataFrame]
@@ -22,20 +22,18 @@ class RfpWorkflowState(TypedDict):
 # Step 2: Create the nodes for each agent in our graph
 def sales_node(state):
     print("\n--- [Node: Sales Agent] ---")
-    rfp = scan_and_select_rfp(state["rfp_source_file"])
-    # If no RFP is found, set an error in the state
+    # This function no longer needs an argument since it scrapes a live URL.
+    rfp = scan_and_select_rfp() # <-- CHANGED
     return {"selected_rfp": rfp} if rfp else {"error": "No actionable RFP found."}
 
 def technical_node(state):
     print("\n--- [Node: Technical Agent] ---")
     analysis = analyze_rfp_specs(state["selected_rfp"])
-    # If analysis fails, set an error
     return {"technical_analysis": analysis} if analysis is not None else {"error": "Technical analysis failed."}
 
 def pricing_node(state):
     print("\n--- [Node: Pricing Agent] ---")
     pricing = calculate_pricing(state["technical_analysis"])
-    # If pricing fails, set an error
     return {"final_pricing": pricing} if pricing is not None else {"error": "Pricing calculation failed."}
 
 # Step 3: Define the conditional logic (edges) for the graph
@@ -68,11 +66,9 @@ app = workflow.compile()
 # --- RUN THE WORKFLOW ---
 print("🚀🚀🚀 Workflow Starting... 🚀🚀🚀")
 
-# Define the initial input for the workflow
-initial_state = {"rfp_source_file": "rfp_page_1.html"}
-
-# Invoke the graph with the initial state
-final_state = app.invoke(initial_state)
+# We no longer need to provide an initial state with a filename.
+# We invoke the graph with an empty dictionary.
+final_state = app.invoke({}) # <-- CHANGED
 
 print("\n\n--- ✨ FINAL RFP RESPONSE SUMMARY ✨ ---")
 if final_state.get("error"):
