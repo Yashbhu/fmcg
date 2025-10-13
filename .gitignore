@@ -3,4 +3,6 @@
 **/.venv/
 .env
 model/.env
-**/api.ts
+# Ignore frontend API configuration
+frontend/lib/api.ts
+
