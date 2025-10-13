@@ -5,3 +5,7 @@ selenium
 beautifulsoup4
 requests
 langgraph
+fastapi
+uvicorn
+playwright
+sqlite3-binary
