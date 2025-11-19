@@ -8,29 +8,27 @@ import sqlite3
 import pandas as pd
 from dotenv import load_dotenv
 
-# 🧠 Optional: Only import Groq when key is available to avoid crashes on import
+
 try:
     from groq import Groq
 except ImportError:
     Groq = None
 
-# --- Load environment variables ---
 load_dotenv()
 
-# --- Initialize Groq client safely ---
 client = None
 api_key = os.getenv("GROQ_API_KEY")
 if Groq and api_key:
     try:
         client = Groq(api_key=api_key)
     except Exception as e:
-        print(f"❗️ Error initializing Groq client: {e}")
+        print(f" Error initializing Groq client: {e}")
 else:
-    print("⚠️ GROQ_API_KEY not set or Groq package missing — skipping live API mode.")
+    print(" GROQ_API_KEY not set or Groq package missing — skipping live API mode.")
 
 ACTIVE_MODEL = "llama-3.1-8b-instant"
 
-# Example fallback text
+
 RFP_DOCUMENT_TEXT = """
 Technical Scope of Supply for Delhi Metro Phase V:
 The contractor shall supply, install, test, and commission the following 1.1 kV grade power cables.
@@ -45,9 +43,9 @@ def analyze_rfp_specs(rfp_summary: dict):
     and matches them to product SKUs from the SQLite database.
     Returns a DataFrame of recommended SKUs + scores.
     """
-    print("⚙️ Technical Agent: Starting analysis...")
+    print(" Technical Agent: Starting analysis...")
 
-    # --- Step 1: Build RFP text ---
+
     rfp_text = ""
     if isinstance(rfp_summary, dict) and "title" in rfp_summary:
         rfp_text = rfp_summary["title"]
@@ -56,7 +54,7 @@ def analyze_rfp_specs(rfp_summary: dict):
     else:
         rfp_text = RFP_DOCUMENT_TEXT
 
-    # --- Step 2: Construct prompt for LLM ---
+
     prompt = f"""
     Extract all product technical specifications from this RFP text and return a JSON array.
 
@@ -71,7 +69,7 @@ def analyze_rfp_specs(rfp_summary: dict):
 
     required_products = None
 
-    # --- Step 3: Try LLM call with retries ---
+
     if client:
         for i in range(3):
             try:
@@ -87,15 +85,15 @@ def analyze_rfp_specs(rfp_summary: dict):
                     raise ValueError("No JSON block found in Groq response.")
                 json_text = match.group(1)
                 required_products = json.loads(json_text)
-                print("✅ Extracted specs successfully from Groq.")
+                print(" Extracted specs successfully from Groq.")
                 break
             except Exception as e:
-                print(f"❗️ Attempt {i+1} failed: {e}")
+                print(f" Attempt {i+1} failed: {e}")
                 time.sleep(2 ** i)
         else:
-            print("❌ All attempts failed; using fallback specs.")
+            print(" All attempts failed; using fallback specs.")
     else:
-        print("⚠️ Skipping Groq API — using default RFP data.")
+        print(" Skipping Groq API — using default RFP data.")
         required_products = [
             {
                 "VoltageRating": "1.1 kV",
@@ -111,20 +109,20 @@ def analyze_rfp_specs(rfp_summary: dict):
             },
         ]
 
-    # --- Step 4: Load OEM product data ---
+
     try:
         conn = sqlite3.connect("rfp_database.db")
         oem_df = pd.read_sql_query("SELECT * FROM products", conn)
         conn.close()
     except sqlite3.Error as e:
-        print(f"❗️ Database read error: {e}")
+        print(f"Database read error: {e}")
         return None
 
     if not isinstance(required_products, list) or len(required_products) == 0:
-        print("❗️ No products extracted.")
+        print(" No products extracted.")
         return None
 
-    # --- Step 5: Match extracted specs with DB ---
+
     results = []
     for i, req in enumerate(required_products):
         req_clean = {k: str(v).strip().lower() for k, v in req.items()}
@@ -146,11 +144,9 @@ def analyze_rfp_specs(rfp_summary: dict):
         })
 
     df = pd.DataFrame(results)
-    print("✅ Technical Agent: Analysis complete.")
+    print(" Technical Agent: Analysis complete.")
     return df
 
-
-# --- Ensure function is registered at module level ---
 if __name__ == "__main__":
     print("🔍 Self-test: running analyze_rfp_specs() with sample RFP")
     print(analyze_rfp_specs({"title": RFP_DOCUMENT_TEXT}))
