@@ -1,211 +1,183 @@
 MCG – Fast-Moving Consumer Goods Platform
 
 (Working Title)
+# FMCG — Fast-Moving Consumer Goods (tenders & procurement)
 
-Table of Contents
+An application to collect, analyze, and present tenders / RFPs data with a React/Next.js frontend, a Python FastAPI backend, and a small model/database layer for data processing and experiments.
 
-Project Overview
+This README documents the repo layout, tech stack, setup and local development instructions, and where to find important files.
 
-Key Features
+## Table of contents
 
-Architecture & Tech Stack
+- Project overview
+- Key features
+- Tech stack
+- Repository structure and important files
+- Quick start (dev)
+- Backend setup & run
+- Frontend setup & run
+- Model / data and database
+- Environment variables
+- Development notes & tips
+- Contributing
+- License & contact
 
-Getting Started
+## Project overview
+
+This repository collects tools and a UI for working with government and marketplace tenders (RFPs). It contains:
+
+- `frontend/` — Next.js + TypeScript UI built with Tailwind and Radix components for browsing/searching tenders and viewing results.
+- `backend/` — FastAPI-based API that provides endpoints for analysis and data operations.
+- `model/` — scripts and helpers for data ingestion, pricing logic, and experiments (contains CSVs, DB initialization scripts, and agents/orchestrators).
+- `database/` — database files (SQLite) used for quick local development.
+
+This repo is suitable for local development and prototyping; production readiness (scaling, authentication, secure env management) requires additional work.
+
+## Key features
+
+- Ingest tenders from CSV / scraped sources
+- Store and query tenders in a local SQLite DB for dev
+- Frontend for searching/filtering tenders and viewing analytics
+- Backend analysis endpoints (see `backend/routes/`)
+- Model code for pricing and workflow orchestration in `model/`
+
+## Tech stack
+
+- Frontend: Next.js 13 (React 18), TypeScript, Tailwind CSS, Radix UI components
+- Backend: Python, FastAPI, Uvicorn
+- Data: SQLite (local dev), CSV files for sample input
+- Tools: Playwright (scraping/testing), BeautifulSoup, pandas
+
+Dependencies (representative):
+
+- frontend/package.json shows Next.js 13.5.1, React 18, Tailwind CSS 3.x, TypeScript
+- backend/requirements.txt includes: fastapi, uvicorn, playwright, beautifulsoup4, pandas, groq, python-dotenv
+
+## Repository structure (high-level)
+
+Root
+- `frontend/` — Next.js app (UI)
+	- `app/` — Next.js app routes and pages
+	- `components/` — reusable UI components and primitives
+	- `package.json` — frontend dependencies & scripts
+
+- `backend/` — FastAPI server
+	- `main.py` — FastAPI app & CORS setup
+	- `routes/` — router modules (`analyze.py`, `tenders.py`)
+	- `requirements.txt` — Python dependencies
+
+- `model/` — data/modeling scripts
+	- `init_db_pricing.py`, `setup_database.py`, `run_workflow.py` — DB init and experimentation scripts
+	- `pricing_agent_logic.py`, `sales_agent_logic.py`, `technical_agent_logic.py` — business/agent logic
+	- CSVs: `product_database.csv`, `product_prices.csv`, `tenders.csv`, `test_prices.csv`
+
+- `database/` — contains `rfp_database.db` (SQLite) used for local dev
+- `tenders.csv` — sample tenders file
+
+## Quick start — development
 
 Prerequisites
 
-Installation
+- Node.js (≥16) and npm/yarn
+- Python 3.9+ (recommended) and pip
+- Optionally: SQLite client
 
-Configuration
+1) Clone
 
-Running Locally
+		git clone https://github.com/Yashbhu/fmcg.git
+		cd fmcg
 
-Directory Structure
+2) Backend setup
 
-Usage
+		python -m venv .venv
+		source .venv/bin/activate   # macOS / Linux (zsh)
+		pip install --upgrade pip
+		pip install -r backend/requirements.txt
 
-Frontend
+Notes: Playwright requires an additional install step to download browser binaries:
 
-Backend
+		playwright install
 
-Model / Database
+Run the backend (development):
 
-Deployment
+		# from repo root
+		uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
-Testing
+By default the FastAPI app is configured in `backend/main.py`. The app includes CORS settings for localhost:3000.
 
-Contributing
+3) Frontend setup
 
-License
+		cd frontend
+		npm install
+		npm run dev
 
-Contact
+Open the frontend at http://localhost:3000. The frontend expects the backend API to be available at `http://localhost:8000` unless configured otherwise.
 
-Project Overview
+## Model / data & database
 
-The FMCG platform is designed to serve as a comprehensive solution for managing fast‐moving consumer goods (FMCG) supply-chains, tendering, and procurement workflows. It supports integration of government e-marketplaces, e-tenders, and database management for tenders and RFPs.
+- The repo contains a sample SQLite DB at `database/rfp_database.db` for quick testing. You can open it with `sqlite3 database/rfp_database.db` or any DB browser.
+- CSV files live under `model/` and the repo root (`tenders.csv`). Use the scripts in `model/` to import or reinitialize the DB:
 
-Key Features
+		# examples (edit/inspect scripts before running)
+		python model/setup_database.py
+		python model/init_db_pricing.py
 
-A frontend web application (UI) for users: browsing tenders, submitting bids, tracking status.
+Inspect the scripts to see exact behavior. Back up your DB before re-running initialization scripts.
 
-A backend API server handling business logic, authentication, data processing.
+## Environment variables (example)
 
-A model/database layer: storing tender data, RFPs, user data, bidding history, analytics.
+Create a `.env` file in `backend/` (or set env vars globally). Example entries:
 
-Data ingestion from external sources (e.g., government portals) into a unified database.
+		DATABASE_URL=sqlite:///./database/rfp_database.db
+		SECRET_KEY=replace-with-a-secret
+		API_PORT=8000
 
-Reporting dashboards for monitoring tender activity, win-rates, vendor performance.
+Load these using `python-dotenv` or your deployment environment.
 
-Architecture & Tech Stack
+## Useful endpoints
 
-Frontend: TypeScript, JavaScript, CSS – likely using a modern framework (React/Vue/Angular) based on code.
+- The backend includes routers in `backend/routes/`.
+- Example (development):
+	- Analyze: `GET http://localhost:8000/analyze/...` (see `backend/routes/analyze.py`)
 
-Backend: Python (or another language) – handling API endpoints, business logic, data access.
+Open the automatic docs when backend runs: `http://localhost:8000/docs` (Swagger) and `http://localhost:8000/redoc`.
 
-Database: SQLite (evidenced by rfp_database.db in repo) for local/dev; can be swapped for Postgres/MySQL in production.
+## Development notes & tips
 
-Model: A module/folder (model/) where domain models and business schema reside.
+- Keep the backend running at port 8000 and the frontend at 3000 for the default CORS setup.
+- When updating front/backend contracts, update types in the frontend (if you add API shapes).
+- Use small virtual environments for Python work and commit `requirements.txt` changes when dependencies change.
 
-Data ingestion/CSV: tenders.csv hints at CSV import capability for tender data.
+## Testing
 
-Overall layered architecture: Frontend → Backend API → Model/Database.
+- There are no formal tests checked into the repo by default. Add tests under `backend/tests/` using `pytest` and under `frontend/` using your preferred test runner (Jest/React Testing Library).
 
-Getting Started
-Prerequisites
+## Contributing
 
-Node.js (version ≥ X) and npm/yarn for frontend.
+Contributions welcome. Please:
 
-Python (version ≥ X) for backend (if applicable).
+1. Fork the repo and create a feature branch
+2. Run linters and tests locally
+3. Open a PR describing your change and include screenshots or sample requests if relevant
 
-SQLite3 (or equivalent) installed locally.
+If you plan to make breaking changes to the API, document them in this README and create a migration plan for the DB.
 
-Git for version control.
+## License
 
-Installation
+Add your chosen license (e.g., MIT). If this repo is private, specify internal usage rules instead.
 
-Clone the repository:
+## Contact / Maintainers
 
-git clone https://github.com/Yashbhu/fmcg.git
-cd fmcg
+Repo owner: `Yashbhu` (GitHub: Yashbhu)
 
+Questions? Open issues or PRs in the repository.
 
-Navigate to sub-modules:
+---
 
-cd frontend
-npm install
-cd ../backend
-pip install -r requirements.txt
+If you'd like, I can also:
 
-Configuration
+- Add a short `CONTRIBUTING.md` with PR and commit guidelines
+- Add example `.env.example` and a `Makefile` or `dev` script to simplify starting both services
+- Add a brief GitHub Actions workflow skeleton for CI
 
-Create a .env file in backend/ with necessary environment variables (e.g., DATABASE_URL, SECRET_KEY, API_PORT).
-
-In frontend/, adjust config.js or similar with backend API base URL.
-
-Running Locally
-
-Start backend:
-
-cd backend
-python app.py
-
-
-Start frontend:
-
-cd frontend
-npm start
-
-
-Open http://localhost:3000 (or configured port) in your browser.
-```
-Directory Structure
-fmcg/
-├── frontend/        # UI application
-├── backend/         # API server & business logic
-├── database/        # database-related files (e.g., SQLite DB, migrations)
-├── model/           # domain/model definitions, schema, modules
-├── tenders.csv      # sample data ingestion file
-└── README.md        # this readme
-```
-
-Adjust folders and names as your repo reflects.
-
-Usage
-Frontend
-
-Browse list of tenders.
-
-Filter/search tenders by date, category, status.
-
-Register/login as vendor.
-
-Submit bids, view bid status.
-
-Backend
-
-RESTful endpoints:
-
-GET /api/tenders → list all tenders
-
-POST /api/bids → submit a bid
-
-GET /api/vendors/:vendorId → vendor profile & activity
-(Fill in actual endpoint definitions)
-
-Authentication (JWT or session‐based) for protected routes.
-
-Model / Database
-
-Data schema includes tables/collections: Tenders, Vendors, Bids, RFPs.
-
-Sample CSV file tenders.csv can be imported using a script in database/.
-
-Example script:
-
-python database/import_tenders.py --file tenders.csv
-
-Deployment
-
-Use environment variables to configure production database (e.g., Postgres) and services.
-
-Build frontend for production:
-
-cd frontend
-npm run build
-
-
-Deploy backend on a cloud provider or container (Docker, AWS, Azure).
-
-Serve built frontend as static assets or via CDN.
-
-Ensure HTTPS, logging, monitoring are configured.
-
-Testing
-
-Backend tests: in backend/tests/ – run via pytest.
-
-Frontend tests: in frontend/tests/ – run via npm test.
-
-CI/CD configuration (GitHub Actions) to run tests on every PR.
-
-Contributing
-
-Contributions are very welcome! To contribute:
-
-Fork the repository
-
-Create a new branch: git checkout -b feature/YourFeature
-
-Commit your changes with clear messages
-
-Push your branch and create a Pull Request (PR)
-
-Ensure your changes include tests where applicable and pass existing tests
-
-Please adhere to the code style and add documentation/comments for new features.
-
-License
-
-Specify your license here (e.g., MIT License).
-
-MIT License
+Tell me which of these you'd like next and I will add them.
