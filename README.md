@@ -173,11 +173,3 @@ Repo owner: `Yashbhu` (GitHub: Yashbhu)
 Questions? Open issues or PRs in the repository.
 
 ---
-
-If you'd like, I can also:
-
-- Add a short `CONTRIBUTING.md` with PR and commit guidelines
-- Add example `.env.example` and a `Makefile` or `dev` script to simplify starting both services
-- Add a brief GitHub Actions workflow skeleton for CI
-
-Tell me which of these you'd like next and I will add them.
