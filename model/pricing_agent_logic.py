@@ -29,7 +29,7 @@ def calculate_pricing(technical_analysis_df: pd.DataFrame):
         test_prices_df = pd.read_sql_query("SELECT TestName, TestCost FROM tests", conn)
         conn.close()
     except sqlite3.Error as e:
-        print(f"❗️ Database read error: {e}")
+        print(f" Database read error: {e}")
         return None
 
     
