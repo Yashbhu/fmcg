@@ -44,4 +44,4 @@ pd.DataFrame(test_data, columns=["TestName", "TestCost"]).to_sql(
 )
 
 conn.close()
-print("✅ Pricing database initialized successfully with sample data!")
+print(" Pricing database initialized successfully with sample data!")
